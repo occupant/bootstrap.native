@@ -1,13 +1,11 @@
 
 /* Native JavaScript for Bootstrap 4 | Popover
 ---------------------------------------------- */
-
-import { styleTip } from '../util/misc.js';
 import { hasClass, addClass, removeClass } from '../util/class.js';
-import { bootstrapCustomEvent, dispatchCustomEvent, on, off, mouseHover, touchEvents, passiveHandler } from '../util/event.js';
+import { bootstrapCustomEvent, dispatchCustomEvent, on, off, mouseHover, mouseEvents, touchEvents, passiveHandler } from '../util/event.js';
 import { queryElement } from '../util/selector.js';
 import { emulateTransitionEnd } from '../util/transition.js';
-import { componentInit } from '../util/misc.js';
+import { componentInit, styleTip } from '../util/misc.js';
 
 // POPOVER DEFINITION
 // ==================
@@ -22,40 +20,41 @@ export default function Popover(element,options) {
 
   // popover and timer
   let popover = null,
-    timer = 0,
-    // title and content
-    titleString,
-    contentString;
+      timer = 0,
+      isIphone = /(iPhone|iPod|iPad)/.test(navigator.userAgent),
+      // title and content
+      titleString,
+      contentString;
 
   // DATA API
   let triggerData, // click / hover / focus
-    animationData, // true / false
+      animationData, // true / false
 
-    placementData,
-    dismissibleData,
-    delayData,
-    containerData,
+      placementData,
+      dismissibleData,
+      delayData,
+      containerData,
 
-    // close btn for dissmissible popover
-    closeBtn,
+      // close btn for dissmissible popover
+      closeBtn,
 
-    // custom events
-    showCustomEvent,
-    shownCustomEvent,
-    hideCustomEvent,
-    hiddenCustomEvent,
+      // custom events
+      showCustomEvent,
+      shownCustomEvent,
+      hideCustomEvent,
+      hiddenCustomEvent,
 
-    // check container
-    containerElement,
-    containerDataElement,
+      // check container
+      containerElement,
+      containerDataElement,
 
-    // maybe the element is inside a modal
-    modal,
+      // maybe the element is inside a modal
+      modal,
 
-    // maybe the element is inside a fixed navbar
-    navbarFixedTop,
-    navbarFixedBottom,
-    placementClass;
+      // maybe the element is inside a fixed navbar
+      navbarFixedTop,
+      navbarFixedBottom,
+      placementClass;
 
   // handlers
   function dismissibleHandler(e) {
@@ -72,7 +71,7 @@ export default function Popover(element,options) {
   }
   function removePopover() {
     self.options.container.removeChild(popover);
-    timer = null; popover = null; 
+    timer = null; popover = null;
   }
 
   function createPopover() {
@@ -90,7 +89,7 @@ export default function Popover(element,options) {
 
     if ( contentString !== null && self.options.template === null ) { //create the popover from data attributes
 
-      popover.setAttribute('role','tooltip');     
+      popover.setAttribute('role','tooltip');
 
       if (titleString !== null) {
         const popoverTitle = document.createElement('h3');
@@ -100,10 +99,10 @@ export default function Popover(element,options) {
       }
 
       //set popover content
-      var popoverBody = document.createElement('div');
-      addClass(popoverBody,'popover-body');
-      popoverBody.innerHTML = self.options.dismissible && titleString === null ? contentString + closeBtn : contentString;
-      popover.appendChild(popoverBody);
+      const popoverBodyMarkup = document.createElement('div');
+      addClass(popoverBodyMarkup,'popover-body');
+      popoverBodyMarkup.innerHTML = self.options.dismissible && titleString === null ? contentString + closeBtn : contentString;
+      popover.appendChild(popoverBodyMarkup);
 
     } else {  // or create the popover from template
       const popoverTemplate = document.createElement('div');
@@ -111,7 +110,7 @@ export default function Popover(element,options) {
       popover.className = popoverTemplate.firstChild.className;
       popover.innerHTML = popoverTemplate.firstChild.innerHTML;
 
-      const popoverHeader = queryElement('.popover-header',popover), 
+      const popoverHeader = queryElement('.popover-header',popover),
             popoverBody = queryElement('.popover-body',popover);
 
       // fill the template with content from data attributes
@@ -124,7 +123,7 @@ export default function Popover(element,options) {
     popover.style.display = 'block';
     !hasClass(popover, 'popover') && addClass(popover, 'popover');
     !hasClass(popover, self.options.animation) && addClass(popover, self.options.animation);
-    !hasClass(popover, placementClass) && addClass(popover, placementClass);      
+    !hasClass(popover, placementClass) && addClass(popover, placementClass);
   }
   function showPopover() {
     !hasClass(popover,'show') && ( addClass(popover,'show') );
@@ -132,11 +131,18 @@ export default function Popover(element,options) {
   function updatePopover() {
     styleTip(element, popover, self.options.placement, self.options.container);
   }
+  function provideFocus () {
+    if (popover === null) { element.focus(); }
+  }
   function toggleEvents(action) {
     if (self.options.trigger === 'hover') {
+      action( element, mouseEvents.down, self.show );
       action( element, mouseHover[0], self.show );
       if (!self.options.dismissible) { action( element, mouseHover[1], self.hide ); } // export const mouseHover = ('onmouseleave' in document) ? [ 'mouseenter', 'mouseleave'] : [ 'mouseover', 'mouseout' ]
-    } else if ('click' == self.options.trigger || 'focus' == self.options.trigger) {
+    } else if ('click' == self.options.trigger) {
+      action( element, self.options.trigger, self.toggle );
+    } else if ('focus' == self.options.trigger) {
+      isIphone && action( element, 'click', provideFocus );
       action( element, self.options.trigger, self.toggle );
     }
   }
@@ -149,11 +155,12 @@ export default function Popover(element,options) {
   }
   // event toggle
   function dismissHandlerToggle(action) {
-    if ('click' == self.options.trigger || 'focus' == self.options.trigger) {
-      !self.options.dismissible && action( element, 'blur', self.hide );
-      !self.options.dismissible && action( document, touchEvents[0], touchHandler, passiveHandler );
+    if (self.options.dismissible) {
+      action( document, 'click', dismissibleHandler );
+    } else {
+      'focus' == self.options.trigger && action( element, 'blur', self.hide );
+      'hover' == self.options.trigger && action( document, touchEvents.start, touchHandler, passiveHandler );
     }
-    self.options.dismissible && action( document, 'click', dismissibleHandler );     
     action( window, 'resize', self.hide, passiveHandler );
   }
   // triggers
@@ -169,7 +176,7 @@ export default function Popover(element,options) {
 
   // public methods / handlers
   self.toggle = () => {
-    if (popover === null) { self.show(); } 
+    if (popover === null) { self.show(); }
     else { self.hide(); }
   };
   self.show = () => {
@@ -248,11 +255,11 @@ export default function Popover(element,options) {
     self.options.placement = options.placement ? options.placement : placementData || 'top';
     self.options.delay = parseInt(options.delay || delayData) || 200;
     self.options.dismissible = options.dismissible || dismissibleData === 'true' ? true : false;
-    self.options.container = containerElement ? containerElement 
-                            : containerDataElement ? containerDataElement 
-                            : navbarFixedTop ? navbarFixedTop
-                            : navbarFixedBottom ? navbarFixedBottom
-                            : modal ? modal : document.body;
+    self.options.container = containerElement ? containerElement
+                           : containerDataElement ? containerDataElement
+                           : navbarFixedTop ? navbarFixedTop
+                           : navbarFixedBottom ? navbarFixedBottom
+                           : modal ? modal : document.body;
 
     placementClass = `bs-popover-${self.options.placement}`
 
@@ -261,14 +268,14 @@ export default function Popover(element,options) {
     let popoverContents = getContents()
     titleString = popoverContents[0];
     contentString = popoverContents[1];
-    
+
     if ( !contentString && !self.options.template ) return;
-  
+
     // init
     if ( !element.Popover ) { // prevent adding event handlers twice
       toggleEvents(on);
     }
-  
+
     // associate target to init object
     self.element = element;
     element.Popover = self;
@@ -276,4 +283,3 @@ export default function Popover(element,options) {
   })
 
 }
-

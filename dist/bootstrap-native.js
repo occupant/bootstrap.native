@@ -19,6 +19,7 @@
     return element.classList.contains(classNAME);
   }
 
+  var mouseEvents = { down: 'mousedown', up: 'mouseup' };
   var touchEvents = { start: 'touchstart', end: 'touchend', move:'touchmove', cancel:'touchcancel' };
   var mouseHover = ('onmouseleave' in document) ? [ 'mouseenter', 'mouseleave'] : [ 'mouseover', 'mouseout' ];
   function on (element, event, handler, options) {
@@ -81,6 +82,8 @@
     duration ? one(element, transitionEndEvent, function(e){ !called && handler(e), called = 1; })
              : setTimeout(function() { !called && handler(), called = 1; }, 17);
   }
+
+  var componentsInit = {};
 
   function setFocus (element){
     element.focus ? element.focus() : element.setActive();
@@ -348,7 +351,6 @@
     }
     function keyHandler(ref) {
       var which = ref.which;
-
       if (self.vars.isSliding) { return; }
       switch (which) {
         case 39:
@@ -698,7 +700,6 @@
     function keyHandler(ref) {
       var which = ref.which;
       var keyCode = ref.keyCode;
-
       var key = which || keyCode,
             activeItem = document.activeElement,
             isSameElement = activeItem === element,
@@ -892,7 +893,6 @@
     }
     function keyHandler(ref) {
       var which = ref.which;
-
       if ( modal.isAnimating ) { return; }
       if (self.options.keyboard && which == 27 && hasClass(modal,'show') ) {
         self.hide();
@@ -991,26 +991,27 @@
     options = options || {};
     var self = this;
     var popover = null,
-      timer = 0,
-      titleString,
-      contentString;
+        timer = 0,
+        isIphone = /(iPhone|iPod|iPad)/.test(navigator.userAgent),
+        titleString,
+        contentString;
     var triggerData,
-      animationData,
-      placementData,
-      dismissibleData,
-      delayData,
-      containerData,
-      closeBtn,
-      showCustomEvent,
-      shownCustomEvent,
-      hideCustomEvent,
-      hiddenCustomEvent,
-      containerElement,
-      containerDataElement,
-      modal,
-      navbarFixedTop,
-      navbarFixedBottom,
-      placementClass;
+        animationData,
+        placementData,
+        dismissibleData,
+        delayData,
+        containerData,
+        closeBtn,
+        showCustomEvent,
+        shownCustomEvent,
+        hideCustomEvent,
+        hiddenCustomEvent,
+        containerElement,
+        containerDataElement,
+        modal,
+        navbarFixedTop,
+        navbarFixedBottom,
+        placementClass;
     function dismissibleHandler(e) {
       if (popover !== null && e.target === queryElement('.close',popover)) {
         self.hide();
@@ -1042,19 +1043,19 @@
           popoverTitle.innerHTML = self.options.dismissible ? titleString + closeBtn : titleString;
           popover.appendChild(popoverTitle);
         }
-        var popoverBody = document.createElement('div');
-        addClass(popoverBody,'popover-body');
-        popoverBody.innerHTML = self.options.dismissible && titleString === null ? contentString + closeBtn : contentString;
-        popover.appendChild(popoverBody);
+        var popoverBodyMarkup = document.createElement('div');
+        addClass(popoverBodyMarkup,'popover-body');
+        popoverBodyMarkup.innerHTML = self.options.dismissible && titleString === null ? contentString + closeBtn : contentString;
+        popover.appendChild(popoverBodyMarkup);
       } else {
         var popoverTemplate = document.createElement('div');
         popoverTemplate.innerHTML = self.options.template.trim();
         popover.className = popoverTemplate.firstChild.className;
         popover.innerHTML = popoverTemplate.firstChild.innerHTML;
         var popoverHeader = queryElement('.popover-header',popover),
-              popoverBody$1 = queryElement('.popover-body',popover);
+              popoverBody = queryElement('.popover-body',popover);
         titleString && popoverHeader && (popoverHeader.innerHTML = titleString.trim());
-        contentString && popoverBody$1 && (popoverBody$1.innerHTML = contentString.trim());
+        contentString && popoverBody && (popoverBody.innerHTML = contentString.trim());
       }
       self.options.container.appendChild(popover);
       popover.style.display = 'block';
@@ -1068,11 +1069,18 @@
     function updatePopover() {
       styleTip(element, popover, self.options.placement, self.options.container);
     }
+    function provideFocus () {
+      if (popover === null) { element.focus(); }
+    }
     function toggleEvents(action) {
       if (self.options.trigger === 'hover') {
+        action( element, mouseEvents.down, self.show );
         action( element, mouseHover[0], self.show );
         if (!self.options.dismissible) { action( element, mouseHover[1], self.hide ); }
-      } else if ('click' == self.options.trigger || 'focus' == self.options.trigger) {
+      } else if ('click' == self.options.trigger) {
+        action( element, self.options.trigger, self.toggle );
+      } else if ('focus' == self.options.trigger) {
+        isIphone && action( element, 'click', provideFocus );
         action( element, self.options.trigger, self.toggle );
       }
     }
@@ -1082,11 +1090,12 @@
       }
     }
     function dismissHandlerToggle(action) {
-      if ('click' == self.options.trigger || 'focus' == self.options.trigger) {
-        !self.options.dismissible && action( element, 'blur', self.hide );
-        !self.options.dismissible && action( document, touchEvents[0], touchHandler, passiveHandler );
+      if (self.options.dismissible) {
+        action( document, 'click', dismissibleHandler );
+      } else {
+        'focus' == self.options.trigger && action( element, 'blur', self.hide );
+        'hover' == self.options.trigger && action( document, touchEvents.start, touchHandler, passiveHandler );
       }
-      self.options.dismissible && action( document, 'click', dismissibleHandler );
       action( window, 'resize', self.hide, passiveHandler );
     }
     function showTrigger() {
@@ -1158,10 +1167,10 @@
       self.options.delay = parseInt(options.delay || delayData) || 200;
       self.options.dismissible = options.dismissible || dismissibleData === 'true' ? true : false;
       self.options.container = containerElement ? containerElement
-                              : containerDataElement ? containerDataElement
-                              : navbarFixedTop ? navbarFixedTop
-                              : navbarFixedBottom ? navbarFixedBottom
-                              : modal ? modal : document.body;
+                             : containerDataElement ? containerDataElement
+                             : navbarFixedTop ? navbarFixedTop
+                             : navbarFixedBottom ? navbarFixedBottom
+                             : modal ? modal : document.body;
       placementClass = "bs-popover-" + (self.options.placement);
       var popoverContents = getContents();
       titleString = popoverContents[0];
@@ -1480,21 +1489,21 @@
   function Tooltip(element,options) {
     options = options || {};
     var self = this,
-      tooltip = null, timer = 0, titleString,
-      animationData,
-      placementData,
-      delayData,
-      containerData,
-      showCustomEvent,
-      shownCustomEvent,
-      hideCustomEvent,
-      hiddenCustomEvent,
-      containerElement,
-      containerDataElement,
-      modal,
-      navbarFixedTop,
-      navbarFixedBottom,
-      placementClass;
+        tooltip = null, timer = 0, titleString,
+        animationData,
+        placementData,
+        delayData,
+        containerData,
+        showCustomEvent,
+        shownCustomEvent,
+        hideCustomEvent,
+        hiddenCustomEvent,
+        containerElement,
+        containerDataElement,
+        modal,
+        navbarFixedTop,
+        navbarFixedBottom,
+        placementClass;
     function getTitle() {
       return element.getAttribute('title')
           || element.getAttribute('data-title')
@@ -1544,17 +1553,18 @@
       }
     }
     function showAction() {
-      on( document, touchEvents[0], touchHandler, passiveHandler );
+      on( document, touchEvents.start, touchHandler, passiveHandler );
       on( window, 'resize', self.hide, passiveHandler );
       dispatchCustomEvent.call(element, shownCustomEvent);
     }
     function hideAction() {
-      off( document, touchEvents[0], touchHandler, passiveHandler );
+      off( document, touchEvents.start, touchHandler, passiveHandler );
       off( window, 'resize', self.hide, passiveHandler );
       removeToolTip();
       dispatchCustomEvent.call(element, hiddenCustomEvent);
     }
     function toggleEvents(action) {
+      action(element, mouseEvents.down, self.show);
       action(element, mouseHover[0], self.show);
       action(element, mouseHover[1], self.hide);
     }
@@ -1616,10 +1626,10 @@
       self.options.template = options.template ? options.template : null;
       self.options.delay = parseInt(options.delay || delayData) || 200;
       self.options.container = containerElement ? containerElement
-                              : containerDataElement ? containerDataElement
-                              : navbarFixedTop ? navbarFixedTop
-                              : navbarFixedBottom ? navbarFixedBottom
-                              : modal ? modal : document.body;
+                             : containerDataElement ? containerDataElement
+                             : navbarFixedTop ? navbarFixedTop
+                             : navbarFixedBottom ? navbarFixedBottom
+                             : modal ? modal : document.body;
       placementClass = "bs-tooltip-" + (self.options.placement);
       titleString = getTitle();
       if ( !titleString ) { return; }
@@ -1632,8 +1642,6 @@
       element.Tooltip = self;
     });
   }
-
-  var componentsInit = {};
 
   var initCallback = function (lookUp){
     lookUp = lookUp || document;
@@ -1673,28 +1681,9 @@
   componentsInit.Tooltip = [ Tooltip, '[data-toggle="tooltip"],[data-tip="tooltip"]' ];
   document.body ? initCallback() : one( document, 'DOMContentLoaded', initCallback );
 
-  var Util = {
-  	addClass: addClass,
-  	removeClass: removeClass,
-  	hasClass: hasClass,
-  	queryElement: queryElement,
-  	getElementsByClassName: getElementsByClassName,
-  	getElementTransitionDuration: getElementTransitionDuration,
-  	emulateTransitionEnd: emulateTransitionEnd,
-  	on: on,
-  	off: off,
-  	one: one,
-  	bootstrapCustomEvent: bootstrapCustomEvent,
-  	dispatchCustomEvent: dispatchCustomEvent,
-  	passiveHandler: passiveHandler,
-  	setFocus: setFocus,
-  	styleTip: styleTip,
-  	getScroll: getScroll
-  };
-
   var version = "3.0.0";
 
-  var index_umd = {
+  var index = {
     Alert: Alert,
     Button: Button,
     Carousel: Carousel,
@@ -1709,10 +1698,9 @@
     initCallback: initCallback,
     removeDataAPI: removeDataAPI,
     componentsInit: componentsInit,
-    Util: Util,
     Version: version
   };
 
-  return index_umd;
+  return index;
 
 })));
